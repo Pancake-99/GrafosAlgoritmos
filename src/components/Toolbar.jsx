@@ -1,0 +1,43 @@
+import { MousePointer2, Plus, ArrowRightLeft, Edit3, Trash2 } from 'lucide-react';
+
+const tools = [
+  { id: 'move', icon: MousePointer2, label: 'Mover' },
+  { id: 'add', icon: Plus, label: 'Agregar Nodo' },
+  { id: 'connect', icon: ArrowRightLeft, label: 'Conectar' },
+  { id: 'edit', icon: Edit3, label: 'Editar' },
+  { id: 'delete', icon: Trash2, label: 'Borrar' },
+];
+
+function Toolbar({ currentTool, setTool }) {
+  return (
+    <div className="absolute top-4 left-4 flex flex-col gap-2 bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl z-10">
+      {tools.map((tool) => {
+        const Icon = tool.icon;
+        const isActive = currentTool === tool.id;
+        
+        return (
+          <button
+            key={tool.id}
+            onClick={() => setTool(tool.id)}
+            className={`
+              p-3 rounded-lg transition-all duration-200 group relative
+              ${isActive 
+                ? 'bg-cyan-500 text-white shadow-[0_0_10px_rgba(6,182,212,0.5)]' 
+                : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}
+            `}
+            title={tool.label}
+          >
+            <Icon size={24} />
+            
+            {/* Mensajito flotante */}
+            <span className="absolute left-full ml-3 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
+              {tool.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export default Toolbar;
