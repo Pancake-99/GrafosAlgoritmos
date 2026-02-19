@@ -8,7 +8,7 @@ function Cover() {
       <div className="flex flex-col items-center justify-center min-h-[80vh] text-center space-y-12">
         <div className="space-y-8 flex flex-col items-center">
           <img src={logo} alt="Logo" className="w-160 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.3)] mb-0 mt-0" />
-          <h1 className="text-6xl font-bold tracking-tight text-white sm:text-7xl mt-0">
+          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl mt-0">
             Grafos y <span className="text-cyan-500">Algoritmos</span>
           </h1>
         </div>

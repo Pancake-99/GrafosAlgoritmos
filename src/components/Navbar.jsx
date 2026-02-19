@@ -19,21 +19,22 @@ function Navbar() {
         <div className="flex items-center justify-between h-16">
           <div className="flex-shrink-0">
             <span className="text-xl font-bold tracking-tight text-white">
-              Grafos y <span className="text-cyan-500">Algoritmos</span>
+              <span className="md:hidden">G&<span className="text-cyan-500">A</span></span>
+              <span className="hidden md:inline">Grafos y <span className="text-cyan-500">Algoritmos</span></span>
             </span>
           </div>
           <div className="flex space-x-4">
             <Link to="/" className={linkClass('/')}>
               <Home size={20} />
-              <span>Inicio</span>
+              <span className="hidden md:inline">Inicio</span>
             </Link>
             <Link to="/wiki" className={linkClass('/wiki')}>
               <BookOpen size={20} />
-              <span>Wiki</span>
+              <span className="hidden md:inline">Wiki</span>
             </Link>
             <Link to="/graph" className={linkClass('/graph')}>
               <Share2 size={20} />
-              <span>Sim</span>
+              <span className="hidden md:inline">Sim</span>
             </Link>
           </div>
         </div>

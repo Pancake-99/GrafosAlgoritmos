@@ -6,9 +6,9 @@ import Navbar from './components/Navbar';
 
 function App() {
   return (
-    <div className="min-h-screen bg-zinc-900 text-zinc-100 flex flex-col">
+    <div className="h-dvh bg-zinc-900 text-zinc-100 flex flex-col overflow-hidden">
       <Navbar />
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/" element={<COVER />} />
           <Route path="/wiki" element={<WIKI />} />

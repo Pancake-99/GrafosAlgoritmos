@@ -83,7 +83,7 @@ function GraphCanvas() {
       e.stopPropagation();
       
       if (tool === 'delete') {
-          // Delete this specific edge direction
+          // Borrar esta flecha en específico (bye)
           setEdges(edges.filter(e => e !== edge));
           return;
       }
@@ -303,7 +303,7 @@ function GraphCanvas() {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] overflow-hidden bg-zinc-950">
+    <div className="relative w-full h-full overflow-hidden bg-zinc-950">
       <GlitterBackground />
       <Toolbar currentTool={tool} setTool={setTool} />
       <EditModal 
@@ -314,7 +314,7 @@ function GraphCanvas() {
         type={modalType}
       />
 
-      {/* Main Interactive Area */}
+      {/* Área donde ocurre la magia */}
       <div 
         ref={canvasRef}
         className={`w-full h-full relative ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
@@ -359,8 +359,8 @@ function GraphCanvas() {
         </svg>
 
         {nodes.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50 z-0">
-                <p className="text-zinc-500 text-lg">Selecciona "Agregar Nodo" y haz clic para comenzar</p>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                <p className="text-zinc-500 text-lg color-white text-center">Selecciona "Agregar Nodo" y haz clic para comenzar</p>
             </div>
         )}
       </div>

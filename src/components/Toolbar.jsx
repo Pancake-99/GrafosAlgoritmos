@@ -10,7 +10,7 @@ const tools = [
 
 function Toolbar({ currentTool, setTool }) {
   return (
-    <div className="absolute top-4 left-4 flex flex-col gap-2 bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl z-10">
+    <div className="absolute bottom-4 right-4 md:top-4 md:left-4 flex flex-col gap-2 bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl z-10">
       {tools.map((tool) => {
         const Icon = tool.icon;
         const isActive = currentTool === tool.id;
@@ -30,7 +30,7 @@ function Toolbar({ currentTool, setTool }) {
             <Icon size={24} />
             
             {/* Mensajito flotante */}
-            <span className="absolute left-full ml-3 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
+            <span className="absolute right-full mr-3 md:left-full md:ml-3 md:right-auto md:mr-0 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
               {tool.label}
             </span>
           </button>
