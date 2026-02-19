@@ -4,11 +4,11 @@ import logo from '../assets/Logo blanco.png';
 
 function Cover() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col items-center justify-center min-h-[80vh] text-center space-y-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative min-h-[calc(100vh-64px)] flex flex-col justify-center">
+      <div className="flex flex-col items-center justify-center text-center space-y-12">
         <div className="space-y-8 flex flex-col items-center">
-          <img src={logo} alt="Logo" className="w-160 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.3)] mb-0 mt-0" />
-          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl mt-0">
+          <img src={logo} alt="Logo" className="w-140 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.3)] mb-0 mt-0" />
+          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl md:text-7xl mt-0">
             Grafos y <span className="text-cyan-500">Algoritmos</span>
           </h1>
         </div>
@@ -24,6 +24,10 @@ function Cover() {
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
+      </div>
+      
+      <div className="absolute bottom-4 left-0 w-full text-center text-zinc-500 text-sm font-medium opacity-80">
+        Alejandro Alfonso Bobarin Marquez
       </div>
     </div>
   );

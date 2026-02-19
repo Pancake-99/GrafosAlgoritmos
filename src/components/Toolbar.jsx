@@ -10,7 +10,7 @@ const tools = [
 
 function Toolbar({ currentTool, setTool }) {
   return (
-    <div className="absolute bottom-4 right-4 md:top-4 md:left-4 flex flex-col gap-2 bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl z-10">
+    <div className="absolute bottom-4 right-4 md:top-4 md:left-4 md:bottom-auto md:right-auto flex flex-col gap-2 bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl z-10">
       {tools.map((tool) => {
         const Icon = tool.icon;
         const isActive = currentTool === tool.id;

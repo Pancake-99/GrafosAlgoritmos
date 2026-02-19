@@ -134,10 +134,10 @@ function Wiki() {
                Video Recomendado
             </h2>
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-              <a href="https://www.youtube.com/watch?v=videoseries" target="_blank" rel="noopener noreferrer" className="block group">
-                  <h3 className="text-lg font-bold text-white group-hover:text-cyan-400 transition-colors">Teoría de grafos | Te lo explico así nomás</h3>
+              <a href="https://www.youtube.com/watch?v=-VgHk7UMPP4" target="_blank" rel="noopener noreferrer" className="block group">
+                  <h3 className="text-lg font-bold text-white group-hover:text-cyan-400 transition-colors">Learn Graphs in 5 minutes 🌐</h3>
                   <p className="text-zinc-400 text-sm mt-2">
-                      Este video explica el problema de los puentes de Königsberg (el origen de la teoría de grafos) y definiciones básicas en un español casual y digerible.
+                      Graph data structure and algorithms tutorial example explained
                   </p>
                    <div className="mt-4 inline-flex items-center text-sm text-cyan-500 font-medium hover:underline">
                       Ver en YouTube &rarr;
@@ -174,9 +174,9 @@ function Wiki() {
               <div>
                 <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-4">Recursos Web</h3>
                 <ul className="space-y-2 text-sm text-cyan-500/80">
-                  <li><a href="#" className="hover:text-cyan-400 hover:underline">Teoría de Grafos - Wikipedia</a></li>
-                  <li><a href="#" className="hover:text-cyan-400 hover:underline">Matriz de Adyacencia - Wikipedia</a></li>
-                  <li><a href="#" className="hover:text-cyan-400 hover:underline">Grafos: Representación y Recorridos - Runestone Academy</a></li>
+                  <li><a href="https://es.wikipedia.org/wiki/Teor%C3%ADa_de_grafos" className="hover:text-cyan-400 hover:underline">Teoría de Grafos - Wikipedia</a></li>
+                  <li><a href="https://es.wikipedia.org/wiki/Matriz_de_adyacencia" className="hover:text-cyan-400 hover:underline">Matriz de Adyacencia - Wikipedia</a></li>
+                  <li><a href="https://runestone.academy/ns/books/published/pythoned/Graphs/VocabularioYDefiniciones.html" className="hover:text-cyan-400 hover:underline">Grafos: Representación y Recorridos - Runestone Academy</a></li>
                 </ul>
               </div>
             </div>
