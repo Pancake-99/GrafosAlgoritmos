@@ -15,20 +15,38 @@ const COLORS = [
   { label: 'Indigo', value: '#6366f1', tw: 'bg-indigo-500' },
 ];
 
+// mini componente para el picker de colorcitos
+function ColorPicker({ value, onChange, label }) {
+  return (
+    <div className="space-y-1.5">
+      {label && <label className="text-xs text-zinc-500 font-medium">{label}</label>}
+      <div className="flex flex-wrap gap-2">
+        {COLORS.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => onChange(c.value)}
+            className={`w-5 h-5 rounded-md ${c.tw} transition-all hover:scale-110 ${value === c.value ? 'ring-2 ring-white scale-110' : 'opacity-70 hover:opacity-100'}`}
+            title={c.label}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EditModal({ isOpen, onClose, onSave, data, type }) {
-  // Cosas comunes
-  const [color, setColor] = useState(COLORS[0].value);
-  
   // Nodo
+  const [color, setColor] = useState(COLORS[0].value);
   const [label, setLabel] = useState('');
   
   // Lógica de pares: Puede haber conexión de A->B y de B->A
-  // la data del borde debe tener { sourceId, targetId, edgeForward, edgeBackward }
   const [forwardActive, setForwardActive] = useState(false);
   const [forwardWeight, setForwardWeight] = useState('');
+  const [forwardColor, setForwardColor] = useState(COLORS[5].value); // morado default
   
   const [backwardActive, setBackwardActive] = useState(false);
   const [backwardWeight, setBackwardWeight] = useState('');
+  const [backwardColor, setBackwardColor] = useState(COLORS[5].value);
 
   useEffect(() => {
     if (data) {
@@ -39,12 +57,11 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
         // Se espera que la data sea un "Par de Conexión" armado en GraphCanvas
         setForwardActive(!!data.edgeForward);
         setForwardWeight(data.edgeForward?.weight || '');
+        setForwardColor(data.edgeForward?.color || COLORS[5].value);
         
         setBackwardActive(!!data.edgeBackward);
         setBackwardWeight(data.edgeBackward?.weight || '');
-        
-        // Usar color del primer borde que exista o el default
-        setColor(data.edgeForward?.color || data.edgeBackward?.color || COLORS[0].value);
+        setBackwardColor(data.edgeBackward?.color || COLORS[5].value);
       }
     }
   }, [data, type]);
@@ -59,13 +76,12 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
         color 
       });
     } else {
-      // Devolver la info actualizada de la conexión
+      // Devolver la info actualizada de cada dirección con su propio color
       onSave({
         sourceId: data.sourceId,
         targetId: data.targetId,
-        color,
-        forward: { active: forwardActive, weight: forwardWeight },
-        backward: { active: backwardActive, weight: backwardWeight }
+        forward: { active: forwardActive, weight: forwardWeight, color: forwardColor },
+        backward: { active: backwardActive, weight: backwardWeight, color: backwardColor }
       });
     }
     onClose();
@@ -97,20 +113,22 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
             </div>
           )}
 
-          {/* Selector de color */}
-          <div className="space-y-2">
-            <label className="text-sm text-zinc-400 font-medium">Color</label>
-            <div className="flex flex-wrap gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => setColor(c.value)}
-                  className={`w-6 h-6 rounded-md ${c.tw} transition-all hover:scale-110 ${color === c.value ? 'ring-2 ring-white scale-110' : 'opacity-70 hover:opacity-100'}`}
-                  title={c.label}
-                />
-              ))}
+          {/* Selector de color para nodo */}
+          {type === 'node' && (
+            <div className="space-y-2">
+              <label className="text-sm text-zinc-400 font-medium">Color</label>
+              <div className="flex flex-wrap gap-2">
+                {COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setColor(c.value)}
+                    className={`w-6 h-6 rounded-md ${c.tw} transition-all hover:scale-110 ${color === c.value ? 'ring-2 ring-white scale-110' : 'opacity-70 hover:opacity-100'}`}
+                    title={c.label}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Controles de dirección de la conexión */}
           {type === 'edge' && (
@@ -131,6 +149,7 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
                     </label>
                  </div>
                  {forwardActive && (
+                   <div className="space-y-2 pl-6">
                     <input 
                       type="number" 
                       value={forwardWeight}
@@ -138,6 +157,8 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
                       placeholder="Peso"
                       className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-cyan-500"
                     />
+                    <ColorPicker value={forwardColor} onChange={setForwardColor} label="Color" />
+                   </div>
                  )}
                </div>
 
@@ -160,6 +181,7 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
                         </label>
                      </div>
                      {backwardActive && (
+                       <div className="space-y-2 pl-6">
                         <input 
                           type="number" 
                           value={backwardWeight}
@@ -167,6 +189,8 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
                           placeholder="Peso"
                           className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-cyan-500"
                         />
+                        <ColorPicker value={backwardColor} onChange={setBackwardColor} label="Color" />
+                       </div>
                      )}
                    </div>
                  </>

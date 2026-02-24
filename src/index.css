@@ -7,3 +7,8 @@
 body {
   @apply bg-zinc-900 text-zinc-100 min-h-screen font-sans antialiased;
 }
+
+@keyframes connectGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

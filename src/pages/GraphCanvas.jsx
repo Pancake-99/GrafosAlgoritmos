@@ -1,11 +1,27 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
+import { Grid3X3 } from 'lucide-react';
 import GlitterBackground from '../components/GlitterBackground';
 import Toolbar from '../components/Toolbar';
 import EditModal from '../components/EditModal';
+import AdjacencyMatrix from '../components/AdjacencyMatrix';
+import CanvasTour from '../components/CanvasTour';
+import useGraph from '../hooks/useGraph';
 
 function GraphCanvas() {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
+  const {
+    graph,
+    nodesArray: nodes,
+    edgesArray: edges,
+    addNode,
+    removeNode,
+    updateNode,
+    moveNode,
+    addEdge,
+    removeEdge,
+    updateEdge,
+    mutateGraph
+  } = useGraph();
+
   const [tool, setTool] = useState('add');
   
   const [selectedNode, setSelectedNode] = useState(null); 
@@ -15,6 +31,8 @@ function GraphCanvas() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState(null);
   const [modalType, setModalType] = useState('node'); // 'node' o 'edge'
+  const [showMatrix, setShowMatrix] = useState(false);
+  const [showTour, setShowTour] = useState(() => !CanvasTour.isDone());
 
   const canvasRef = useRef(null);
 
@@ -28,14 +46,13 @@ function GraphCanvas() {
         const rect = canvasRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        const newId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
-        setNodes([...nodes, { 
-            id: newId, 
+        const newId = graph.getNextId();
+        addNode(newId, { 
             x, 
             y, 
             label: newId.toString(),
             color: '#06b6d4' // Cian por defecto
-        }]);
+        });
     }
     
     // Deseleccionar
@@ -46,8 +63,7 @@ function GraphCanvas() {
     e.stopPropagation();
 
     if (tool === 'delete') {
-        setNodes(nodes.filter(n => n.id !== node.id));
-        setEdges(edges.filter(edge => edge.source !== node.id && edge.target !== node.id));
+        removeNode(node.id);
         return;
     }
 
@@ -56,16 +72,12 @@ function GraphCanvas() {
             setSelectedNode(node);
         } else {
             // Checar si la conexión ya existe (en esta dirección)
-            const exists = edges.some(edge => edge.source === selectedNode.id && edge.target === node.id);
-            
-            if (!exists) {
-                setEdges([...edges, { 
-                    source: selectedNode.id, 
-                    target: node.id, 
+            if (!graph.hasEdge(selectedNode.id, node.id)) {
+                addEdge(selectedNode.id, node.id, { 
                     weight: '', 
                     isDirected: true, 
                     color: '#a855f7' // Morado por defecto
-                }]);
+                });
             }
             setSelectedNode(null); 
         }
@@ -84,16 +96,16 @@ function GraphCanvas() {
       
       if (tool === 'delete') {
           // Borrar esta flecha en específico (bye)
-          setEdges(edges.filter(e => e !== edge));
+          removeEdge(edge.source, edge.target);
           return;
       }
 
       if (tool === 'edit') {
           // Buscar si hay borde inverso para editar ambos
-          const reverseEdge = edges.find(e => e.source === edge.target && e.target === edge.source);
+          const reverseEdge = graph.getEdge(edge.target, edge.source);
           
-          const sourceNode = nodes.find(n => n.id === edge.source);
-          const targetNode = nodes.find(n => n.id === edge.target);
+          const sourceNode = graph.getNode(edge.source);
+          const targetNode = graph.getNode(edge.target);
 
           setModalData({
               sourceId: edge.source,
@@ -115,16 +127,34 @@ function GraphCanvas() {
           setSelectedNode(node); 
       }
   };
+
+  // touch equivalente para mobile
+  const handleNodeTouchStart = (e, node) => {
+      if (tool === 'move') {
+          e.stopPropagation();
+          e.preventDefault();
+          setDraggingNode(node.id);
+          setSelectedNode(node);
+      }
+  };
   
   const handleMouseMove = (e) => {
       if (draggingNode && tool === 'move') {
           const rect = canvasRef.current.getBoundingClientRect();
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
-          
-          setNodes(nodes.map(n => 
-              n.id === draggingNode ? { ...n, x, y } : n
-          ));
+          moveNode(draggingNode, x, y);
+      }
+  };
+
+  const handleTouchMove = (e) => {
+      if (draggingNode && tool === 'move') {
+          e.preventDefault();
+          const touch = e.touches[0];
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          moveNode(draggingNode, x, y);
       }
   };
   
@@ -134,36 +164,29 @@ function GraphCanvas() {
 
   const handleSaveModal = (updatedData) => {
       if (modalType === 'node') {
-          setNodes(nodes.map(n => n.id === updatedData.id ? updatedData : n));
+          updateNode(updatedData.id, updatedData);
       } else {
-          // updatedData tiene { sourceId, targetId, color, forward: {active, weight}, backward: {active, weight} }
-          
-          let newEdges = edges.filter(e => 
-            !((e.source === updatedData.sourceId && e.target === updatedData.targetId) || 
-              (e.source === updatedData.targetId && e.target === updatedData.sourceId))
-          );
-          
-          if (updatedData.forward.active) {
-              newEdges.push({
-                  source: updatedData.sourceId,
-                  target: updatedData.targetId,
-                  weight: updatedData.forward.weight,
-                  color: updatedData.color,
-                  isDirected: true
-              });
-          }
+          // operación batch: quitar aristas viejas y agregar nuevas en un solo clone
+          mutateGraph(g => {
+              g.removeEdge(updatedData.sourceId, updatedData.targetId);
+              g.removeEdge(updatedData.targetId, updatedData.sourceId);
+              
+              if (updatedData.forward.active) {
+                  g.addEdge(updatedData.sourceId, updatedData.targetId, {
+                      weight: updatedData.forward.weight,
+                      color: updatedData.forward.color,
+                      isDirected: true
+                  });
+              }
 
-          if (updatedData.backward.active) {
-               newEdges.push({
-                  source: updatedData.targetId,
-                  target: updatedData.sourceId,
-                  weight: updatedData.backward.weight,
-                  color: updatedData.color,
-                  isDirected: true
-              });
-          }
-          
-          setEdges(newEdges);
+              if (updatedData.backward.active) {
+                  g.addEdge(updatedData.targetId, updatedData.sourceId, {
+                      weight: updatedData.backward.weight,
+                      color: updatedData.backward.color,
+                      isDirected: true
+                  });
+              }
+          });
       }
   };
 
@@ -196,8 +219,8 @@ function GraphCanvas() {
 
   const renderEdges = () => {
       return edges.map((edge, index) => {
-          const source = nodes.find(n => n.id === edge.source);
-          const target = nodes.find(n => n.id === edge.target);
+          const source = graph.getNode(edge.source);
+          const target = graph.getNode(edge.target);
           if (!source || !target) return null;
 
           // Manejo de auto-bucle (Cíclico)
@@ -233,7 +256,7 @@ function GraphCanvas() {
           }
 
           // Checar si es bidireccional (existe borde inverso)
-          const isBidirectional = edges.some(e => e.source === edge.target && e.target === edge.source);
+          const isBidirectional = graph.hasEdge(edge.target, edge.source);
           
           const coords = getRenderCoords(source, target, isBidirectional);
 
@@ -270,8 +293,8 @@ function GraphCanvas() {
     return edges.map((edge, index) => {
         if (!edge.weight) return null;
         
-        const source = nodes.find(n => n.id === edge.source);
-        const target = nodes.find(n => n.id === edge.target);
+        const source = graph.getNode(edge.source);
+        const target = graph.getNode(edge.target);
         if (!source || !target) return null;
 
         let x, y;
@@ -280,7 +303,7 @@ function GraphCanvas() {
             x = source.x;
             y = source.y - 50;
         } else {
-            const isBidirectional = edges.some(e => e.source === edge.target && e.target === edge.source);
+            const isBidirectional = graph.hasEdge(edge.target, edge.source);
             const coords = getRenderCoords(source, target, isBidirectional);
             x = (coords.x1 + coords.x2) / 2;
             y = (coords.y1 + coords.y2) / 2 - 5;
@@ -293,8 +316,8 @@ function GraphCanvas() {
                 y={y} 
                 fill="white"
                 textAnchor="middle" 
-                className="font-bold text-xs pointer-events-none select-none drop-shadow-md shadow-black"
-                style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}
+                className="font-bold text-xs pointer-events-none select-none"
+                style={{ textShadow: `0 0 6px ${edge.color || '#a855f7'}, 0 0 12px ${edge.color || '#a855f7'}80` }}
             >
                 {edge.weight}
             </text>
@@ -303,71 +326,118 @@ function GraphCanvas() {
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-zinc-950">
-      <GlitterBackground />
-      <Toolbar currentTool={tool} setTool={setTool} />
-      <EditModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSave={handleSaveModal}
-        data={modalData}
-        type={modalType}
-      />
-
-      {/* Área donde ocurre la magia */}
-      <div 
-        ref={canvasRef}
-        className={`w-full h-full relative ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
-        onClick={handleCanvasClick}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-      >
-        {/* Capa 1: Bordes (Z-0) */}
-        <svg className="absolute inset-0 w-full h-full z-0">
-            {renderEdges()}
-        </svg>
-
-        {/* Capa 2: Nodos (Z-10) */}
-        {nodes.map(node => (
-          <div 
-            key={node.id}
-            onMouseDown={(e) => handleNodeMouseDown(e, node)}
-            onClick={(e) => handleNodeClick(e, node)}
-            className={`
-              absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center 
-              text-xs font-bold transition-transform hover:scale-110 z-10 select-none
-              ${selectedNode && selectedNode.id === node.id ? 'ring-4 ring-white' : ''}
-              ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
-              ${tool === 'delete' ? 'hover:ring-4 hover:ring-red-500' : ''}
-            `}
-            style={{
-              left: node.x,
-              top: node.y,
-              backgroundColor: '#18181b', 
-              border: `2px solid ${node.color || '#06b6d4'}`, 
-              color: 'white', // TEXTO BLANCO A LA FUERZA
-              boxShadow: `0 0 15px ${node.color}50`
-            }}
-          >
-            {node.label || node.id}
+    <div className="flex flex-col md:flex-row w-full h-full overflow-hidden bg-zinc-950">
+      {/* Zona del canvas */}
+      <div className={`relative flex-1 overflow-hidden ${showMatrix ? 'h-1/2 md:h-full' : 'h-full'}`}>
+        <GlitterBackground />
+        {/* Toolbar + botón matriz en un solo contenedor posicionado */}
+        <div className="absolute bottom-4 right-4 md:top-4 md:left-4 md:bottom-auto md:right-auto z-10 flex flex-col gap-3">
+          <Toolbar currentTool={tool} setTool={setTool} />
+          <div className="bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl">
+            <button
+              data-tour="tool-matrix"
+              onClick={() => setShowMatrix(!showMatrix)}
+              className={`
+                p-3 rounded-lg transition-all duration-200 group relative
+                ${showMatrix 
+                  ? 'bg-cyan-500 text-white shadow-[0_0_10px_rgba(6,182,212,0.5)]' 
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}
+              `}
+              title="Matriz de Adyacencia"
+            >
+              <Grid3X3 size={24} />
+              <span className="absolute right-full mr-3 md:left-full md:ml-3 md:right-auto md:mr-0 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
+                Matriz
+              </span>
+            </button>
           </div>
-        ))}
+        </div>
+        <EditModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onSave={handleSaveModal}
+          data={modalData}
+          type={modalType}
+        />
 
-        {/* Capa 3: Etiquetas (Z-20) - Hasta arriba */}
-        <svg className="absolute inset-0 w-full h-full z-20 pointer-events-none">
-            {renderEdgeLabels()}
-        </svg>
+        {/* Área donde ocurre la magia */}
+        <div 
+          ref={canvasRef}
+          className={`w-full h-full relative ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
+          onClick={handleCanvasClick}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleMouseUp}
+        >
+          {/* Capa 1: Bordes (Z-0) */}
+          <svg className="absolute inset-0 w-full h-full z-0">
+              {renderEdges()}
+          </svg>
 
-        {nodes.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                <p className="text-zinc-500 text-lg color-white text-center">Selecciona "Agregar Nodo" y haz clic para comenzar</p>
+          {/* Capa 2: Nodos (Z-10) */}
+          {nodes.map(node => {
+            const isConnectSelected = tool === 'connect' && selectedNode && selectedNode.id === node.id;
+            const isOtherSelected = selectedNode && selectedNode.id === node.id && tool !== 'connect';
+            const isDragging = draggingNode === node.id;
+            return (
+            <div 
+              key={node.id}
+              onMouseDown={(e) => handleNodeMouseDown(e, node)}
+              onTouchStart={(e) => handleNodeTouchStart(e, node)}
+              onClick={(e) => handleNodeClick(e, node)}
+              className={`
+                absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center 
+                text-xs font-bold hover:scale-110 z-10 select-none
+                ${isOtherSelected ? 'ring-4 ring-white' : ''}
+                ${isConnectSelected ? 'scale-110' : ''}
+                ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+                ${tool === 'delete' ? 'hover:ring-4 hover:ring-red-500' : ''}
+              `}
+              style={{
+                left: node.x,
+                top: node.y,
+                backgroundColor: '#18181b', 
+                border: `2px solid ${node.color || '#06b6d4'}`, 
+                color: 'white',
+                transition: isDragging ? 'none' : 'transform 150ms, box-shadow 150ms',
+                boxShadow: isConnectSelected
+                  ? `0 0 20px ${node.color || '#06b6d4'}, 0 0 40px ${node.color || '#06b6d4'}90, 0 0 60px ${node.color || '#06b6d4'}50`
+                  : `0 0 15px ${node.color}50`,
+                animation: isConnectSelected ? 'connectGlow 1.5s ease-in-out infinite' : 'none'
+              }}
+            >
+              {node.label || node.id}
             </div>
-        )}
+            );
+          })}
+
+          {/* Capa 3: Etiquetas (Z-20) - Hasta arriba */}
+          <svg className="absolute inset-0 w-full h-full z-20 pointer-events-none">
+              {renderEdgeLabels()}
+          </svg>
+
+          {nodes.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                  <p className="text-zinc-500 text-lg color-white text-center">Selecciona "Agregar Nodo" y haz clic para comenzar</p>
+              </div>
+          )}
+        </div>
+
+
+        <div className="absolute bottom-4 right-4 text-xs text-zinc-500 pointer-events-none select-none z-30">
+          Nodos: {nodes.length} | Aristas: {edges.length}
+        </div>
       </div>
 
-      <div className="absolute bottom-4 right-4 text-xs text-zinc-500 pointer-events-none select-none z-30">
-        Nodos: {nodes.length} | Aristas: {edges.length}
-      </div>
+      {/* Panel de la matriz de adyacencia */}
+      {showMatrix && (
+        <div className="w-full md:w-80 h-1/2 md:h-full shrink-0">
+          <AdjacencyMatrix graph={graph} onClose={() => setShowMatrix(false)} />
+        </div>
+      )}
+      {/* Tour interactivo */}
+      {showTour && <CanvasTour onFinish={() => setShowTour(false)} />}
     </div>
   );
 }

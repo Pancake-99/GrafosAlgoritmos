@@ -26,8 +26,8 @@ function Cover() {
         </div>
       </div>
       
-      <div className="absolute bottom-4 left-0 w-full text-center text-zinc-500 text-sm font-medium opacity-80">
-        Alejandro Alfonso Bobarin Marquez
+      <div className="absolute bottom-4 left-0 w-full text-center text-zinc-500 text-xs opacity-70">
+        creado por: Alejandro Alfonso Bobarin Marquez · alejandro.a.bobarin.marquez@gmail.com · 2026
       </div>
     </div>
   );
