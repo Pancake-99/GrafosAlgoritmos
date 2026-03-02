@@ -153,4 +153,25 @@ export default class Graph {
     }
     return copy;
   }
+
+  // exportar como objeto plano (para guardar a JSON)
+  serialize() {
+    return {
+      nodes: this.getNodesArray(),
+      edges: this.getEdgesArray()
+    };
+  }
+
+  // reconstruir grafo desde objeto plano
+  static deserialize(data) {
+    const g = new Graph();
+    for (const node of data.nodes) {
+      g.addNode(node.id, node);
+    }
+    for (const edge of data.edges) {
+      const { source, target, ...rest } = edge;
+      g.addEdge(source, target, rest);
+    }
+    return g;
+  }
 }

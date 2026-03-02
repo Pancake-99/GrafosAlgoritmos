@@ -48,6 +48,11 @@ export default function useGraph() {
     mutate(g => g.updateEdge(source, target, data));
   }, [mutate]);
 
+  // cargar un grafo completo desde objeto serializado
+  const loadGraph = useCallback((data) => {
+    setGraph(Graph.deserialize(data));
+  }, []);
+
   // --- Derivados para rendering (misma forma que antes) ---
 
   const nodesArray = useMemo(() => graph.getNodesArray(), [graph]);
@@ -64,6 +69,7 @@ export default function useGraph() {
     addEdge,
     removeEdge,
     updateEdge,
+    loadGraph,
     mutateGraph: mutate  // para operaciones batch (ej: editar arista en modal)
   };
 }

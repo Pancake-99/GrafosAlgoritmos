@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Grid3X3 } from 'lucide-react';
+import { Grid3X3, Save, Upload } from 'lucide-react';
 import GlitterBackground from '../components/GlitterBackground';
 import Toolbar from '../components/Toolbar';
 import EditModal from '../components/EditModal';
@@ -19,8 +19,11 @@ function GraphCanvas() {
     addEdge,
     removeEdge,
     updateEdge,
+    loadGraph,
     mutateGraph
   } = useGraph();
+
+  const fileInputRef = useRef(null);
 
   const [tool, setTool] = useState('add');
   
@@ -35,6 +38,35 @@ function GraphCanvas() {
   const [showTour, setShowTour] = useState(() => !CanvasTour.isDone());
 
   const canvasRef = useRef(null);
+
+  // --- Guardar / Cargar Grafo ---
+
+  const handleSaveGraph = () => {
+    const data = graph.serialize();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'grafo.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadGraph = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        loadGraph(data);
+      } catch {
+        alert('Archivo inválido');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // reset para poder cargar el mismo archivo de nuevo
+  };
 
   // --- Manejadores de Interacción ---
 
@@ -101,8 +133,9 @@ function GraphCanvas() {
       }
 
       if (tool === 'edit') {
-          // Buscar si hay borde inverso para editar ambos
-          const reverseEdge = graph.getEdge(edge.target, edge.source);
+          // Buscar si hay borde inverso para editar ambos (no aplica a self-loops)
+          const isSelfLoop = edge.source === edge.target;
+          const reverseEdge = isSelfLoop ? null : graph.getEdge(edge.target, edge.source);
           
           const sourceNode = graph.getNode(edge.source);
           const targetNode = graph.getNode(edge.target);
@@ -179,7 +212,7 @@ function GraphCanvas() {
                   });
               }
 
-              if (updatedData.backward.active) {
+              if (updatedData.backward.active && updatedData.sourceId !== updatedData.targetId) {
                   g.addEdge(updatedData.targetId, updatedData.sourceId, {
                       weight: updatedData.backward.weight,
                       color: updatedData.backward.color,
@@ -350,6 +383,35 @@ function GraphCanvas() {
                 Matriz
               </span>
             </button>
+          </div>
+          <div className="bg-zinc-900/80 backdrop-blur-md p-2 rounded-xl border border-zinc-700 shadow-xl flex flex-col gap-2">
+            <button
+              onClick={handleSaveGraph}
+              className="p-3 rounded-lg transition-all duration-200 group relative text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              title="Guardar Grafo"
+            >
+              <Save size={24} />
+              <span className="absolute right-full mr-3 md:left-full md:ml-3 md:right-auto md:mr-0 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
+                Guardar
+              </span>
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3 rounded-lg transition-all duration-200 group relative text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              title="Cargar Grafo"
+            >
+              <Upload size={24} />
+              <span className="absolute right-full mr-3 md:left-full md:ml-3 md:right-auto md:mr-0 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
+                Cargar
+              </span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleLoadGraph}
+              className="hidden"
+            />
           </div>
         </div>
         <EditModal 
