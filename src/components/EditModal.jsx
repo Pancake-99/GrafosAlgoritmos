@@ -34,10 +34,11 @@ function ColorPicker({ value, onChange, label }) {
   );
 }
 
-function EditModal({ isOpen, onClose, onSave, data, type }) {
+function EditModal({ isOpen, onClose, onSave, data, type, mode = 'edit', cpmMode = false }) {
   // Nodo
   const [color, setColor] = useState(COLORS[0].value);
   const [label, setLabel] = useState('');
+  const [duration, setDuration] = useState('');
   
   // Lógica de pares: Puede haber conexión de A->B y de B->A
   const [forwardActive, setForwardActive] = useState(false);
@@ -53,6 +54,7 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
       if (type === 'node') {
         setLabel(data.label || data.id.toString());
         setColor(data.color || COLORS[0].value);
+        setDuration(data.cpm?.duration ?? '');
       } else if (type === 'edge') {
         // Se espera que la data sea un "Par de Conexión" armado en GraphCanvas
         setForwardActive(!!data.edgeForward);
@@ -70,11 +72,11 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
 
   const handleSave = () => {
     if (type === 'node') {
-      onSave({ 
-        ...data, 
-        label, 
-        color 
-      });
+      const nodeData = { ...data, label, color };
+      if (cpmMode) {
+        nodeData.cpm = { ...data.cpm, duration };
+      }
+      onSave(nodeData);
     } else {
       // Devolver la info actualizada de cada dirección con su propio color
       onSave({
@@ -92,7 +94,7 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
       <div className="bg-zinc-900 border border-zinc-700 p-6 rounded-xl w-96 shadow-2xl space-y-5">
         <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
           <h3 className="text-lg font-bold text-white">
-            Editar {type === 'node' ? 'Nodo' : 'Conexión'}
+            {mode === 'create' ? 'Nuevo' : 'Editar'} {type === 'node' ? 'Nodo' : 'Conexión'}
           </h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
             <X size={20} />
@@ -127,6 +129,20 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
                   />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Duración para CPM */}
+          {type === 'node' && cpmMode && (
+            <div className="space-y-2">
+              <label className="text-sm text-zinc-400 font-medium">Duración</label>
+              <input 
+                type="number" 
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="0"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              />
             </div>
           )}
 
@@ -210,7 +226,7 @@ function EditModal({ isOpen, onClose, onSave, data, type }) {
             onClick={handleSave}
             className="px-4 py-2 text-sm font-bold text-black bg-cyan-400 hover:bg-cyan-300 rounded-lg transition-colors shadow-lg shadow-cyan-900/20"
           >
-            Guardar
+            {mode === 'create' ? 'Crear' : 'Guardar'}
           </button>
         </div>
       </div>

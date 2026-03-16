@@ -1,17 +1,15 @@
 import {
 	MousePointer2,
 	Plus,
-	ArrowRightLeft,
 	Edit3,
 	Trash2,
 } from "lucide-react";
 
 const tools = [
-	{ id: "move", icon: MousePointer2, label: "Mover" },
-	{ id: "add", icon: Plus, label: "Agregar Nodo" },
-	{ id: "connect", icon: ArrowRightLeft, label: "Conectar" },
-	{ id: "edit", icon: Edit3, label: "Editar" },
-	{ id: "delete", icon: Trash2, label: "Borrar" },
+	{ id: "move", icon: MousePointer2, label: "Mover", key: "g" },
+	{ id: "create", icon: Plus, label: "Crear", key: "a" },
+	{ id: "edit", icon: Edit3, label: "Editar", key: "e" },
+	{ id: "delete", icon: Trash2, label: "Borrar", key: "x" },
 ];
 
 function Toolbar({ currentTool, setTool, onDeleteDoubleClick }) {
@@ -47,7 +45,7 @@ function Toolbar({ currentTool, setTool, onDeleteDoubleClick }) {
 
 						{/* Mensajito flotante */}
 						<span className="absolute right-full mr-3 md:left-full md:ml-3 md:right-auto md:mr-0 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-zinc-700">
-							{tool.label}
+							{tool.label} <span className="text-zinc-500">({tool.key.toUpperCase()})</span>
 						</span>
 					</button>
 				);

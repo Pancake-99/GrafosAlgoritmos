@@ -174,4 +174,98 @@ export default class Graph {
     }
     return g;
   }
+
+  // --- CPM (Critical Path Method) ---
+  solveCPM() {
+    const nodeIds = Array.from(this.nodes.keys());
+    if (nodeIds.length === 0) return null;
+
+    const predecessors = new Map();
+    const successors = new Map();
+    for (const id of nodeIds) {
+      predecessors.set(id, []);
+      successors.set(id, []);
+    }
+    for (const [source, neighbors] of this.adjList) {
+      for (const [target] of neighbors) {
+        successors.get(source).push(target);
+        predecessors.get(target).push(source);
+      }
+    }
+
+    // orden topologico (Kahn)
+    const inDegree = new Map();
+    for (const id of nodeIds) {
+      inDegree.set(id, predecessors.get(id).length);
+    }
+    const queue = [];
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) queue.push(id);
+    }
+    const topoOrder = [];
+    while (queue.length > 0) {
+      const node = queue.shift();
+      topoOrder.push(node);
+      for (const succ of successors.get(node)) {
+        inDegree.set(succ, inDegree.get(succ) - 1);
+        if (inDegree.get(succ) === 0) queue.push(succ);
+      }
+    }
+
+    if (topoOrder.length !== nodeIds.length) return null; // ciclo
+
+    const duration = new Map();
+    for (const id of nodeIds) {
+      const nd = this.nodes.get(id);
+      duration.set(id, parseFloat(nd.cpm?.duration) || 0);
+    }
+
+    // paso hacia adelante
+    const es = new Map();
+    const ef = new Map();
+    for (const id of topoOrder) {
+      const preds = predecessors.get(id);
+      es.set(id, preds.length === 0 ? 0 : Math.max(...preds.map(p => ef.get(p))));
+      ef.set(id, es.get(id) + duration.get(id));
+    }
+
+    const projectDuration = Math.max(...topoOrder.map(id => ef.get(id)));
+
+    // paso hacia atras
+    const lf = new Map();
+    const ls = new Map();
+    for (const id of topoOrder.slice().reverse()) {
+      const succs = successors.get(id);
+      lf.set(id, succs.length === 0 ? projectDuration : Math.min(...succs.map(s => ls.get(s))));
+      ls.set(id, lf.get(id) - duration.get(id));
+    }
+
+    const float = new Map();
+    for (const id of nodeIds) {
+      float.set(id, ls.get(id) - es.get(id));
+    }
+
+    const criticalEdges = new Set();
+    for (const [source, neighbors] of this.adjList) {
+      for (const [target] of neighbors) {
+        if (float.get(source) === 0 && float.get(target) === 0 && ef.get(source) === es.get(target)) {
+          criticalEdges.add(`${source}-${target}`);
+        }
+      }
+    }
+
+    const cpmData = new Map();
+    for (const id of nodeIds) {
+      cpmData.set(id, {
+        es: es.get(id),
+        ef: ef.get(id),
+        ls: ls.get(id),
+        lf: lf.get(id),
+        float: float.get(id),
+        duration: duration.get(id),
+      });
+    }
+
+    return { cpmData, criticalEdges, projectDuration };
+  }
 }

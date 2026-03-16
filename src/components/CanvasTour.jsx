@@ -14,14 +14,9 @@ const STEPS = [
     desc: 'Arrastra los nodos para reorganizar tu grafo.',
   },
   {
-    target: 'tool-add',
-    title: 'Agregar Nodo',
-    desc: 'Haz clic en el canvas para crear un nuevo nodo.',
-  },
-  {
-    target: 'tool-connect',
-    title: 'Conectar',
-    desc: 'Haz clic en un nodo y luego en otro para crear una arista entre ellos.',
+    target: 'tool-create',
+    title: 'Crear',
+    desc: 'Clic en el canvas = nuevo nodo. Arrastra de un nodo a otro = nueva arista. También puedes hacer doble clic en cualquier modo.',
   },
   {
     target: 'tool-edit',
