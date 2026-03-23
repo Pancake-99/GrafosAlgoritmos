@@ -8,6 +8,7 @@ import AdjacencyMatrix from "../components/AdjacencyMatrix";
 import CpmNode from "../components/CpmNode";
 import CanvasTour from "../components/CanvasTour";
 import useGraph from "../hooks/useGraph";
+import AlgorithmsPanel from "../components/AlgorithmsPanel";
 
 function GraphCanvas() {
 	const {
@@ -57,13 +58,66 @@ function GraphCanvas() {
 	const [showMatrix, setShowMatrix] = useState(false);
 	const [showTour, setShowTour] = useState(() => !CanvasTour.isDone());
 	const [isSaveOpen, setIsSaveOpen] = useState(false);
-	const [cpmMode, setCpmMode] = useState(false);
+	
+	const [activeAlgorithm, setActiveAlgorithm] = useState("none");
+	const [cpmStartNode, setCpmStartNode] = useState(null);
+	const [cpmEndNode, setCpmEndNode] = useState(null);
+	const [assignationType, setAssignationType] = useState("min"); // 'min' o 'max'
+	
+	const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
+
+	const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+	const [isPanning, setIsPanning] = useState(false);
+	const panOriginRef = useRef(null);
+	const hasPannedRef = useRef(false);
+
+	const cpmMode = activeAlgorithm === "cpm";
+	const assignationMode = activeAlgorithm === "assignation";
+
+	const bipartiteData = useMemo(() => graph.getBipartiteData(), [graph, nodes, edges]);
+
+	// Desactivar assignationMode si el grafo deja de ser bipartito
+	useEffect(() => {
+		if (assignationMode && !bipartiteData) {
+			setActiveAlgorithm("none");
+		}
+	}, [bipartiteData, assignationMode]);
+
+	// resolver Assignment
+	const assignationResult = useMemo(() => {
+		if (!assignationMode || !bipartiteData) return null;
+		return graph.solveHungarian(assignationType);
+	}, [assignationMode, assignationType, bipartiteData, graph]);
 
 	// resolver CPM automaticamente cuando esta activo
 	const cpmResult = useMemo(() => {
 		if (!cpmMode) return null;
-		return graph.solveCPM();
-	}, [cpmMode, graph]);
+		return graph.solveCPM(cpmStartNode, cpmEndNode);
+	}, [cpmMode, graph, cpmStartNode, cpmEndNode]);
+
+	const cpmSelectionMode = cpmResult?.requiresStartSelection
+		? "start"
+		: cpmResult?.requiresEndSelection
+		? "end"
+		: null;
+
+	// Reset CPM selection when toggling off
+	useEffect(() => {
+		if (!cpmMode) {
+			setCpmStartNode(null);
+			setCpmEndNode(null);
+		}
+	}, [cpmMode]);
+
+	// Reset CPM selection if nodes or edges change in a way that affects available choices
+	useEffect(() => {
+		if (cpmMode) {
+			// A simple reset for now. Ideally, we only reset if the selected nodes are deleted
+			// or if new start/end nodes appear.
+			if (cpmStartNode && !graph.getNode(cpmStartNode)) setCpmStartNode(null);
+			if (cpmEndNode && !graph.getNode(cpmEndNode)) setCpmEndNode(null);
+		}
+	}, [nodes, edges, cpmMode, graph, cpmStartNode, cpmEndNode]);
 
 	const canvasRef = useRef(null);
 
@@ -121,8 +175,8 @@ function GraphCanvas() {
 
 	const findNodeAtPosition = useCallback((clientX, clientY) => {
 		const rect = canvasRef.current.getBoundingClientRect();
-		const x = clientX - rect.left;
-		const y = clientY - rect.top;
+		const x = clientX - rect.left - panOffset.x;
+		const y = clientY - rect.top - panOffset.y;
 		const NODE_RADIUS = 20;
 		for (const node of nodes) {
 			const dx = node.x - x;
@@ -130,24 +184,28 @@ function GraphCanvas() {
 			if (Math.sqrt(dx * dx + dy * dy) <= NODE_RADIUS) return node;
 		}
 		return null;
-	}, [nodes]);
+	}, [nodes, panOffset]);
 
 	// --- Manejadores de Interacción ---
 
 	const handleCanvasClick = (e) => {
-		if (e.target !== canvasRef.current && e.target.tagName !== "svg") return;
+		// Allow clicks on canvas background, svgs, and the canvas element
+		const tag = e.target.tagName;
+		const isCanvasBg = e.target === canvasRef.current || tag === "svg" || tag === "canvas";
+		if (!isCanvasBg) return;
 
-		// ignorar click si acabamos de hacer un drag (evita crear nodo al soltar)
-		if (justDraggedRef.current) {
+		// ignorar click si acabamos de hacer un drag o pan
+		if (justDraggedRef.current || hasPannedRef.current) {
 			justDraggedRef.current = false;
+			hasPannedRef.current = false;
 			return;
 		}
 
 		// En modo crear, clic en el fondo = nuevo nodo
 		if (tool === "create") {
 			const rect = canvasRef.current.getBoundingClientRect();
-			const x = e.clientX - rect.left;
-			const y = e.clientY - rect.top;
+			const x = e.clientX - rect.left - panOffset.x;
+			const y = e.clientY - rect.top - panOffset.y;
 			const newId = graph.getNextId();
 			setModalData({
 				id: newId,
@@ -167,10 +225,12 @@ function GraphCanvas() {
 
 	// Doble clic en el fondo = crear nodo (funciona en cualquier modo)
 	const handleCanvasDoubleClick = (e) => {
-		if (e.target !== canvasRef.current && e.target.tagName !== "svg") return;
+		const tag = e.target.tagName;
+		const isCanvasBg = e.target === canvasRef.current || tag === "svg" || tag === "canvas";
+		if (!isCanvasBg) return;
 		const rect = canvasRef.current.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+		const x = e.clientX - rect.left - panOffset.x;
+		const y = e.clientY - rect.top - panOffset.y;
 		const newId = graph.getNextId();
 		setModalData({
 			id: newId,
@@ -186,6 +246,16 @@ function GraphCanvas() {
 
 	const handleNodeClick = (e, node) => {
 		e.stopPropagation();
+
+		// Handle CPM node selection first
+		if (cpmMode && cpmSelectionMode) {
+			if (cpmSelectionMode === "start") {
+				setCpmStartNode(node.id);
+			} else if (cpmSelectionMode === "end") {
+				setCpmEndNode(node.id);
+			}
+			return; // Don't trigger edit/move when selecting
+		}
 
 		if (tool === "delete") {
 			removeNode(node.id);
@@ -253,11 +323,31 @@ function GraphCanvas() {
 		}
 	};
 
+	const handleCanvasMouseDown = (e) => {
+		// Only start panning if clicking directly on canvas background (not on nodes/edges)
+		const tag = e.target.tagName;
+		const isCanvasBg = e.target === canvasRef.current || tag === "svg" || tag === "canvas";
+		if (!isCanvasBg) return;
+		setIsPanning(true);
+		hasPannedRef.current = false;
+		panOriginRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+	};
+
 	const handleMouseMove = (e) => {
+		if (isPanning && panOriginRef.current && !draggingNode) {
+			const newX = e.clientX - panOriginRef.current.x;
+			const newY = e.clientY - panOriginRef.current.y;
+			if (Math.abs(panOffset.x - newX) > 2 || Math.abs(panOffset.y - newY) > 2) {
+				hasPannedRef.current = true;
+			}
+			setPanOffset({ x: newX, y: newY });
+			return;
+		}
+
 		if (!draggingNode) return;
 		const rect = canvasRef.current.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+		const x = e.clientX - rect.left - panOffset.x;
+		const y = e.clientY - rect.top - panOffset.y;
 
 		if (tool === "move") {
 			// mover el nodo
@@ -271,13 +361,34 @@ function GraphCanvas() {
 		}
 	};
 
+	const handleCanvasTouchStart = (e) => {
+		const tag = e.target.tagName;
+		const isCanvasBg = e.target === canvasRef.current || tag === "svg" || tag === "canvas";
+		if (!isCanvasBg) return;
+		setIsPanning(true);
+		hasPannedRef.current = false;
+		const touch = e.touches[0];
+		panOriginRef.current = { x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y };
+	};
+
 	const handleTouchMove = (e) => {
+		if (isPanning && panOriginRef.current && !draggingNode) {
+			const touch = e.touches[0];
+			const newX = touch.clientX - panOriginRef.current.x;
+			const newY = touch.clientY - panOriginRef.current.y;
+			if (Math.abs(panOffset.x - newX) > 2 || Math.abs(panOffset.y - newY) > 2) {
+				hasPannedRef.current = true;
+			}
+			setPanOffset({ x: newX, y: newY });
+			return;
+		}
+
 		if (!draggingNode) return;
 		e.preventDefault();
 		const touch = e.touches[0];
 		const rect = canvasRef.current.getBoundingClientRect();
-		const x = touch.clientX - rect.left;
-		const y = touch.clientY - rect.top;
+		const x = touch.clientX - rect.left - panOffset.x;
+		const y = touch.clientY - rect.top - panOffset.y;
 
 		if (tool === "move") {
 			moveNode(draggingNode, x, y);
@@ -290,6 +401,14 @@ function GraphCanvas() {
 	};
 
 	const handleMouseUp = (e) => {
+		// Always stop panning
+		if (isPanning) {
+			setIsPanning(false);
+			panOriginRef.current = null;
+			// If we actually panned (moved), skip other actions
+			if (hasPannedRef.current) return;
+		}
+
 		if (draggingNode && tool === "create") {
 			justDraggedRef.current = true;
 			// checar si soltamos sobre otro nodo
@@ -399,19 +518,54 @@ function GraphCanvas() {
 		return { x: tx - dx * scale, y: ty - dy * scale };
 	};
 
+	// recortar linea para que la flecha toque el borde del circulo (radio 20)
+	const clipToCircle = (sx, sy, tx, ty, radius) => {
+		const dx = tx - sx;
+		const dy = ty - sy;
+		const len = Math.sqrt(dx * dx + dy * dy);
+		if (len === 0) return { x: tx, y: ty };
+		const scale = radius / len;
+		return { x: tx - dx * scale, y: ty - dy * scale };
+	};
+
 	const renderEdges = () => {
 		const CPM_DARK = "#1a4a5c";
 		const CPM_CRITICAL = "#22d3a0";
+		const ASG_DARK = "#3f3f46"; 
+		const ASG_HIGHLIGHT = "#f59e0b"; 
 
 		return edges.map((edge, index) => {
 			const source = graph.getNode(edge.source);
 			const target = graph.getNode(edge.target);
 			if (!source || !target) return null;
 
-			const isCritical = cpmResult?.criticalEdges?.has(`${edge.source}-${edge.target}`);
-			const edgeColor = cpmMode ? (isCritical ? CPM_CRITICAL : CPM_DARK) : (edge.color || "#a855f7");
-			const edgeWidth = cpmMode && isCritical ? 3 : 2;
-			const edgeFilter = cpmMode && isCritical ? `drop-shadow(0 0 6px ${CPM_CRITICAL})` : "none";
+			const edgeId = `${edge.source}-${edge.target}`;
+			const isHovered = hoveredEdgeId === edgeId;
+			const isOtherHovered = hoveredEdgeId !== null && !isHovered;
+
+			const isCritical = cpmResult?.criticalEdges?.has(edgeId);
+			const isAssigned = assignationResult?.assignedEdges?.has(edgeId);
+
+			let edgeColor = edge.color || "#a855f7";
+			let edgeWidth = 2;
+			let edgeFilter = "none";
+			let opacity = isOtherHovered ? 0.4 : 1;
+
+			if (cpmMode) {
+				edgeColor = isCritical ? CPM_CRITICAL : CPM_DARK;
+				edgeWidth = isCritical ? 3 : 2;
+				edgeFilter = isCritical ? `drop-shadow(0 0 6px ${CPM_CRITICAL})` : "none";
+			} else if (assignationMode) {
+				edgeColor = isAssigned ? ASG_HIGHLIGHT : ASG_DARK;
+				edgeWidth = isAssigned ? 3 : 2;
+				edgeFilter = isAssigned ? `drop-shadow(0 0 6px ${ASG_HIGHLIGHT})` : "none";
+			}
+
+			if (isHovered) {
+				edgeWidth += 1; // Thicker on hover
+				edgeFilter = `drop-shadow(0 0 12px ${edgeColor})`; // Stronger shadow
+				opacity = 1;
+			}
 
 			// Manejo de auto-bucle (Cíclico)
 			if (edge.source === edge.target) {
@@ -426,13 +580,16 @@ function GraphCanvas() {
 					<g
 						key={`${edge.source}-${edge.target}-${index}`}
 						onClick={(e) => handleEdgeClick(e, edge)}
-						className="cursor-pointer group"
+						onMouseEnter={() => setHoveredEdgeId(edgeId)}
+						onMouseLeave={() => setHoveredEdgeId(null)}
+						className="cursor-pointer group transition-opacity duration-200"
+						style={{ opacity }}
 					>
 						{/* Gatillo invisible */}
 						<path
 							d={loopPath}
 							stroke="transparent"
-							strokeWidth="15"
+							strokeWidth="20"
 							fill="none"
 						/>
 						{/* Bucle visible */}
@@ -470,12 +627,20 @@ function GraphCanvas() {
 
 			const coords = getRenderCoords(source, target, isBidirectional);
 
-			// en modo CPM, recortar para que la flecha toque el borde del rectangulo
-			const CPM_HW = 75; // mitad del ancho del nodo CPM
-			const CPM_HH = 34; // mitad del alto del nodo CPM
+			// en modo CPM, recortar para rectangulo, en modo normal, para circulo
 			if (cpmMode) {
+				const CPM_HW = 75; // mitad del ancho del nodo CPM
+				const CPM_HH = 34; // mitad del alto del nodo CPM
 				const srcClip = clipToRect(coords.x2, coords.y2, coords.x1, coords.y1, CPM_HW, CPM_HH);
 				const tgtClip = clipToRect(coords.x1, coords.y1, coords.x2, coords.y2, CPM_HW, CPM_HH);
+				coords.x1 = srcClip.x;
+				coords.y1 = srcClip.y;
+				coords.x2 = tgtClip.x;
+				coords.y2 = tgtClip.y;
+			} else {
+				const REGULAR_RADIUS = 20; // mitad de w-10 h-10 (40px)
+				const srcClip = clipToCircle(coords.x2, coords.y2, coords.x1, coords.y1, REGULAR_RADIUS);
+				const tgtClip = clipToCircle(coords.x1, coords.y1, coords.x2, coords.y2, REGULAR_RADIUS);
 				coords.x1 = srcClip.x;
 				coords.y1 = srcClip.y;
 				coords.x2 = tgtClip.x;
@@ -486,7 +651,10 @@ function GraphCanvas() {
 				<g
 					key={`${edge.source}-${edge.target}-${index}`}
 					onClick={(e) => handleEdgeClick(e, edge)}
-					className="cursor-pointer group"
+					onMouseEnter={() => setHoveredEdgeId(edgeId)}
+					onMouseLeave={() => setHoveredEdgeId(null)}
+					className="cursor-pointer group transition-opacity duration-200"
+					style={{ opacity }}
 				>
 					{/* Área de gatillo invisible */}
 					<line
@@ -495,7 +663,7 @@ function GraphCanvas() {
 						x2={coords.x2}
 						y2={coords.y2}
 						stroke="transparent"
-						strokeWidth="15"
+						strokeWidth="20"
 					/>
 					{/* Línea visible */}
 					<line
@@ -538,6 +706,12 @@ function GraphCanvas() {
 			const target = graph.getNode(edge.target);
 			if (!source || !target) return null;
 
+			const edgeId = `${edge.source}-${edge.target}`;
+			const isHovered = hoveredEdgeId === edgeId;
+			const isOtherHovered = hoveredEdgeId !== null && !isHovered;
+			const opacity = isOtherHovered ? 0.4 : 1;
+			const edgeColor = edge.color || "#a855f7";
+
 			let x, y;
 
 			if (edge.source === edge.target) {
@@ -546,9 +720,11 @@ function GraphCanvas() {
 			} else {
 				const isBidirectional = graph.hasEdge(edge.target, edge.source);
 				const coords = getRenderCoords(source, target, isBidirectional);
-				x = (coords.x1 + coords.x2) / 2;
-				y = (coords.y1 + coords.y2) / 2 - 5;
+				x = (coords.x1 * 0.4) + (coords.x2 * 0.6); // 40/60 shift toward target tip
+				y = (coords.y1 * 0.4) + (coords.y2 * 0.6) - 8;
 			}
+
+			const fontSize = isHovered ? "text-sm font-black" : "text-xs font-bold";
 
 			return (
 				<text
@@ -557,9 +733,12 @@ function GraphCanvas() {
 					y={y}
 					fill="white"
 					textAnchor="middle"
-					className="font-bold text-xs pointer-events-none select-none"
+					className={`${fontSize} pointer-events-none select-none transition-all duration-200`}
 					style={{
-						textShadow: `0 0 6px ${edge.color || "#a855f7"}, 0 0 12px ${edge.color || "#a855f7"}80`,
+						textShadow: isHovered 
+							? `0 0 10px ${edgeColor}, 0 0 20px ${edgeColor}`
+							: `0 0 6px ${edgeColor}, 0 0 12px ${edgeColor}80`,
+						opacity
 					}}
 				>
 					{edge.weight}
@@ -575,19 +754,23 @@ function GraphCanvas() {
 				className={`relative flex-1 overflow-hidden ${showMatrix ? "h-1/2 md:h-full" : "h-full"}`}
 			>
 				<GlitterBackground />
-				{/* Panel de algoritmos - top center */}
-				<div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-zinc-900/80 backdrop-blur-md p-1.5 rounded-xl border border-zinc-700 shadow-xl flex gap-1.5">
-					<button
-						onClick={() => setCpmMode(!cpmMode)}
-						className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-							cpmMode
-								? "bg-cyan-500 text-white shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-								: "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-						}`}
-					>
-						CPM
-					</button>
-				</div>
+				
+				{/* Top Panel - Algoritmos */}
+				<AlgorithmsPanel 
+					activeAlgorithm={activeAlgorithm}
+					setActiveAlgorithm={setActiveAlgorithm}
+					assignationType={assignationType}
+					setAssignationType={setAssignationType}
+					bipartiteData={bipartiteData !== null}
+					assignationResult={assignationResult}
+				/>
+
+				{/* CPM Selection Prompt */}
+				{cpmMode && cpmSelectionMode && (
+					<div className="absolute top-48 left-1/2 -translate-x-1/2 z-20 bg-amber-500/20 text-amber-500 border border-amber-500/50 px-4 py-2 rounded-lg font-semibold animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+						{cpmSelectionMode === "start" ? "Por favor, selecciona el nodo de inicio" : "Por favor, selecciona el nodo de fin"}
+					</div>
+				)}
 				{/* Toolbar + botón matriz en un solo contenedor posicionado */}
 				<div className="absolute bottom-4 right-4 md:top-4 md:left-4 md:bottom-auto md:right-auto z-10 flex flex-col gap-3">
 					<Toolbar
@@ -663,31 +846,32 @@ function GraphCanvas() {
 				{/* Área donde ocurre la magia */}
 				<div
 					ref={canvasRef}
-					className={`w-full h-full relative ${tool === "move" ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"}`}
+					className={`w-full h-full relative ${isPanning ? 'cursor-grabbing' : tool === 'move' ? 'cursor-grab' : 'cursor-crosshair'}`}
 					onClick={handleCanvasClick}
 					onDoubleClick={handleCanvasDoubleClick}
+					onMouseDown={handleCanvasMouseDown}
 					onMouseMove={handleMouseMove}
 					onMouseUp={handleMouseUp}
+					onMouseLeave={handleMouseUp}
+					onTouchStart={handleCanvasTouchStart}
 					onTouchMove={handleTouchMove}
 					onTouchEnd={handleMouseUp}
+					onTouchCancel={handleMouseUp}
 				>
-					{/* Capa 1: Bordes (Z-0) */}
-					<svg className="absolute inset-0 w-full h-full z-0">
-						{renderEdges()}
-						{/* Preview line mientras arrastras un nodo hacia otro */}
-						{connectPreview && (
+					{/* Capa 1: Aristas (Z-0) */}
+					<svg className="absolute inset-0 w-full h-full z-0" style={{ overflow: "visible", transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}>
+						{connectPreview && tool === "create" && (
 							<line
 								x1={connectPreview.x1}
 								y1={connectPreview.y1}
 								x2={connectPreview.x2}
 								y2={connectPreview.y2}
-								stroke="#a855f7"
+								stroke="#06b6d4"
 								strokeWidth="2"
-								strokeDasharray="6 4"
-								opacity="0.6"
-								pointerEvents="none"
+								strokeDasharray="4"
 							/>
 						)}
+						{renderEdges()}
 					</svg>
 
 					{/* Capa 2: Nodos (Z-10) */}
@@ -709,6 +893,10 @@ function GraphCanvas() {
 									onClick={(e) => handleNodeClick(e, node)}
 									onMouseDown={(e) => handleNodeMouseDown(e, node)}
 									onTouchStart={(e) => handleNodeTouchStart(e, node)}
+									style={{
+										left: node.x + panOffset.x,
+										top: node.y + panOffset.y,
+									}}
 								/>
 							);
 						}
@@ -720,15 +908,15 @@ function GraphCanvas() {
 								onTouchStart={(e) => handleNodeTouchStart(e, node)}
 								onClick={(e) => handleNodeClick(e, node)}
 									className={`
-                absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center 
+                absolute w-10 h-10 -ml-5 -mt-5 rounded-full flex items-center justify-center
                 text-xs font-bold hover:scale-110 z-10 select-none
                 ${isOtherSelected ? "ring-4 ring-white" : ""}
                 ${tool === "move" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
                 ${tool === "delete" ? "hover:ring-4 hover:ring-red-500" : ""}
               `}
 								style={{
-									left: node.x,
-									top: node.y,
+									left: node.x + panOffset.x,
+									top: node.y + panOffset.y,
 									backgroundColor: "#18181b",
 									border: `2px solid ${node.color || "#06b6d4"}`,
 									color: "white",
@@ -744,7 +932,7 @@ function GraphCanvas() {
 					})}
 
 					{/* Capa 3: Etiquetas (Z-20) - Hasta arriba */}
-					<svg className="absolute inset-0 w-full h-full z-20 pointer-events-none">
+					<svg className="absolute inset-0 w-full h-full z-20 pointer-events-none" style={{ overflow: "visible", transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}>
 						{renderEdgeLabels()}
 					</svg>
 
@@ -765,7 +953,11 @@ function GraphCanvas() {
 			{/* Panel de la matriz de adyacencia */}
 			{showMatrix && (
 				<div className="w-full md:w-80 h-1/2 md:h-full shrink-0">
-					<AdjacencyMatrix graph={graph} onClose={() => setShowMatrix(false)} />
+					<AdjacencyMatrix 
+						graph={graph} 
+						onClose={() => setShowMatrix(false)} 
+						assignationResult={assignationMode ? assignationResult : null}
+					/>
 				</div>
 			)}
 			{/* Tour interactivo */}

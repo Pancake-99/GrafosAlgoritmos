@@ -8,14 +8,10 @@ const GlitterBackground = () => {
     const ctx = canvas.getContext('2d');
     let animationFrameId;
 
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-
     const createNoise = () => {
       const w = canvas.width;
       const h = canvas.height;
+      if (w === 0 || h === 0) return;
       const idata = ctx.createImageData(w, h);
       const buffer32 = new Uint32Array(idata.data.buffer);
       const len = buffer32.length;
@@ -44,8 +40,23 @@ const GlitterBackground = () => {
         createNoise();
     };
 
+    let resizeTimer;
+    const resize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (canvas) {
+           canvas.width = window.innerWidth;
+           canvas.height = window.innerHeight;
+           draw();
+        }
+      }, 150);
+    };
+
     window.addEventListener('resize', resize);
-    resize();
+    
+    // Initial draw
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     draw();
 
     return () => {

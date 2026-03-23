@@ -3,7 +3,7 @@
 // fila 2: Label (nombre de la actividad)
 // fila 3: LS | Holgura | LF
 
-function CpmNode({ node, cpmValues, isDragging, isSelected, isDeleteHover, toolIsMove, onClick, onMouseDown, onTouchStart }) {
+function CpmNode({ node, cpmValues, isDragging, isSelected, isDeleteHover, toolIsMove, onClick, onMouseDown, onTouchStart, style }) {
   const v = cpmValues || {};
   const dur = v.duration ?? (node.cpm?.duration || "");
 
@@ -19,8 +19,9 @@ function CpmNode({ node, cpmValues, isDragging, isSelected, isDeleteHover, toolI
         ${isDeleteHover ? "ring-2 ring-red-500" : ""}
       `}
       style={{
-        left: node.x,
-        top: node.y,
+        ...style,
+        left: style?.left ?? node.x,
+        top: style?.top ?? node.y,
         transform: "translate(-50%, -50%)",
         transition: isDragging ? "none" : "transform 150ms, box-shadow 150ms",
         filter: isDragging ? "brightness(1.1)" : "none",
